@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Check, Trash2, Palette, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Plus, Check, Trash2, Palette, ChevronDown, ChevronRight, GripVertical, Edit2 } from 'lucide-react';
 
 const themes = {
   blue: {
@@ -69,6 +69,9 @@ export default function TodoApp() {
   const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
   const [celebration, setCelebration] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editingSubtask, setEditingSubtask] = useState(null);
+  const [editText, setEditText] = useState('');
 
   useEffect(() => {
     const savedTasks = localStorage.getItem('todoTasks');
@@ -142,9 +145,45 @@ export default function TodoApp() {
     }
   };
 
+  const startEditTask = (task) => {
+    setEditingTask(task.id);
+    setEditText(task.text);
+  };
+
+  const startEditSubtask = (taskId, subtask) => {
+    setEditingSubtask({ taskId, subtaskId: subtask.id });
+    setEditText(subtask.text);
+  };
+
+  const saveTaskEdit = () => {
+    if (editText.trim()) {
+      setTasks(tasks.map(task =>
+        task.id === editingTask ? { ...task, text: editText } : task
+      ));
+    }
+    setEditingTask(null);
+    setEditText('');
+  };
+
+  const saveSubtaskEdit = () => {
+    if (editText.trim()) {
+      setTasks(tasks.map(task =>
+        task.id === editingSubtask.taskId
+          ? {
+              ...task,
+              subtasks: task.subtasks.map(sub =>
+                sub.id === editingSubtask.subtaskId ? { ...sub, text: editText } : sub
+              )
+            }
+          : task
+      ));
+    }
+    setEditingSubtask(null);
+    setEditText('');
+  };
+
   const toggleTask = (taskId) => {
     const task = tasks.find(t => t.id === taskId);
-    // Only celebrate when checking OFF (marking as complete)
     if (!task.completed) {
       showCelebration();
     }
@@ -157,7 +196,6 @@ export default function TodoApp() {
   const toggleSubtask = (taskId, subtaskId) => {
     const task = tasks.find(t => t.id === taskId);
     const subtask = task.subtasks.find(s => s.id === subtaskId);
-    // Only celebrate when checking OFF (marking as complete)
     if (!subtask.completed) {
       showCelebration();
     }
@@ -340,7 +378,7 @@ export default function TodoApp() {
               tasks.map((task, taskIndex) => (
                 <div
                   key={task.id}
-                  draggable
+                  draggable={editingTask !== task.id}
                   onDragStart={(e) => handleDragStart(e, taskIndex)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, taskIndex)}
@@ -349,41 +387,70 @@ export default function TodoApp() {
                   {/* Main Task */}
                   <div className="p-4 md:p-6 hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-3 md:gap-4">
-                      <div className="cursor-grab active:cursor-grabbing opacity-50 hover:opacity-100 transition-opacity">
-                        <GripVertical size={20} />
-                      </div>
-                      <button
-                        onClick={() => toggleTask(task.id)}
-                        className={`flex-shrink-0 w-6 h-6 md:w-7 md:h-7 rounded-full border-2 ${
-                          task.completed ? `${currentTheme.accent} border-transparent` : 'border-current'
-                        } flex items-center justify-center transition-all duration-300 hover:scale-110`}
-                      >
-                        {task.completed && <Check size={16} className="text-white" />}
-                      </button>
-                      <span className={`flex-1 text-base md:text-lg transition-all duration-300 ${task.completed ? 'line-through opacity-50' : ''}`}>
-                        {task.text}
-                      </span>
-                      {task.subtasks && task.subtasks.length > 0 && (
+                      {editingTask !== task.id && (
+                        <div className="cursor-grab active:cursor-grabbing opacity-50 hover:opacity-100 transition-opacity">
+                          <GripVertical size={20} />
+                        </div>
+                      )}
+                      {editingTask !== task.id && (
                         <button
-                          onClick={() => toggleExpanded(task.id)}
-                          className={`${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
+                          onClick={() => toggleTask(task.id)}
+                          className={`flex-shrink-0 w-6 h-6 md:w-7 md:h-7 rounded-full border-2 ${
+                            task.completed ? `${currentTheme.accent} border-transparent` : 'border-current'
+                          } flex items-center justify-center transition-all duration-300 hover:scale-110`}
                         >
-                          {expandedTasks[task.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                          {task.completed && <Check size={16} className="text-white" />}
                         </button>
                       )}
-                      <button
-                        onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
-                        className={`${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
-                        title="Add subtask"
-                      >
-                        <Plus size={18} />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className={`flex-shrink-0 ${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      
+                      {editingTask === task.id ? (
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyPress={(e) => handleKeyPress(e, saveTaskEdit)}
+                          onBlur={saveTaskEdit}
+                          className={`flex-1 ${currentTheme.glass} ${currentTheme.text} rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 text-base md:text-lg`}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className={`flex-1 text-base md:text-lg transition-all duration-300 ${task.completed ? 'line-through opacity-50' : ''}`}>
+                          {task.text}
+                        </span>
+                      )}
+
+                      {editingTask !== task.id && (
+                        <>
+                          {task.subtasks && task.subtasks.length > 0 && (
+                            <button
+                              onClick={() => toggleExpanded(task.id)}
+                              className={`${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
+                            >
+                              {expandedTasks[task.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
+                            className={`${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
+                            title="Add subtask"
+                          >
+                            <Plus size={18} />
+                          </button>
+                          <button
+                            onClick={() => startEditTask(task)}
+                            className={`${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
+                            title="Edit task"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => deleteTask(task.id)}
+                            className={`flex-shrink-0 ${currentTheme.button} p-2 rounded-xl transition-all duration-200 hover:scale-105`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -416,32 +483,61 @@ export default function TodoApp() {
                       {task.subtasks.map((subtask, subIndex) => (
                         <div
                           key={subtask.id}
-                          draggable
+                          draggable={editingSubtask?.subtaskId !== subtask.id}
                           onDragStart={(e) => handleDragStart(e, subIndex, true, task.id)}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, subIndex, true, task.id)}
                           className={`ml-8 flex items-center gap-2 md:gap-3 p-3 rounded-xl ${currentTheme.glass} hover:bg-white/5 transition-all`}
                         >
-                          <div className="cursor-grab active:cursor-grabbing opacity-50 hover:opacity-100 transition-opacity">
-                            <GripVertical size={16} />
-                          </div>
-                          <button
-                            onClick={() => toggleSubtask(task.id, subtask.id)}
-                            className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
-                              subtask.completed ? `${currentTheme.accent} border-transparent` : 'border-current'
-                            } flex items-center justify-center transition-all duration-300 hover:scale-110`}
-                          >
-                            {subtask.completed && <Check size={12} className="text-white" />}
-                          </button>
-                          <span className={`flex-1 text-sm md:text-base transition-all duration-300 ${subtask.completed ? 'line-through opacity-50' : ''}`}>
-                            {subtask.text}
-                          </span>
-                          <button
-                            onClick={() => deleteSubtask(task.id, subtask.id)}
-                            className={`flex-shrink-0 ${currentTheme.button} p-1.5 rounded-lg transition-all duration-200 hover:scale-105`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {editingSubtask?.subtaskId !== subtask.id && (
+                            <>
+                              <div className="cursor-grab active:cursor-grabbing opacity-50 hover:opacity-100 transition-opacity">
+                                <GripVertical size={16} />
+                              </div>
+                              <button
+                                onClick={() => toggleSubtask(task.id, subtask.id)}
+                                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
+                                  subtask.completed ? `${currentTheme.accent} border-transparent` : 'border-current'
+                                } flex items-center justify-center transition-all duration-300 hover:scale-110`}
+                              >
+                                {subtask.completed && <Check size={12} className="text-white" />}
+                              </button>
+                            </>
+                          )}
+                          
+                          {editingSubtask?.subtaskId === subtask.id ? (
+                            <input
+                              type="text"
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              onKeyPress={(e) => handleKeyPress(e, saveSubtaskEdit)}
+                              onBlur={saveSubtaskEdit}
+                              className={`flex-1 ${currentTheme.glass} ${currentTheme.text} rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm md:text-base`}
+                              autoFocus
+                            />
+                          ) : (
+                            <span className={`flex-1 text-sm md:text-base transition-all duration-300 ${subtask.completed ? 'line-through opacity-50' : ''}`}>
+                              {subtask.text}
+                            </span>
+                          )}
+
+                          {editingSubtask?.subtaskId !== subtask.id && (
+                            <>
+                              <button
+                                onClick={() => startEditSubtask(task.id, subtask)}
+                                className={`flex-shrink-0 ${currentTheme.button} p-1.5 rounded-lg transition-all duration-200 hover:scale-105`}
+                                title="Edit subtask"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => deleteSubtask(task.id, subtask.id)}
+                                className={`flex-shrink-0 ${currentTheme.button} p-1.5 rounded-lg transition-all duration-200 hover:scale-105`}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>
