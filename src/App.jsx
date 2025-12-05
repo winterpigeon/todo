@@ -89,23 +89,24 @@ export default function TodoApp() {
   }, [theme]);
 
   const calculateProductivityScore = () => {
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.completed).length;
+    if (tasks.length === 0) return 0;
     
-    let totalSubtasks = 0;
-    let completedSubtasks = 0;
+    let totalScore = 0;
+    
     tasks.forEach(task => {
-      if (task.subtasks) {
-        totalSubtasks += task.subtasks.length;
-        completedSubtasks += task.subtasks.filter(s => s.completed).length;
+      const subtaskCount = task.subtasks?.length || 0;
+      
+      if (subtaskCount === 0) {
+        // Task with no subtasks: worth 1.0 if completed
+        totalScore += task.completed ? 1.0 : 0;
+      } else {
+        // Task with subtasks: each subtask is a fraction
+        const completedSubtasks = task.subtasks.filter(s => s.completed).length;
+        totalScore += completedSubtasks / subtaskCount;
       }
     });
     
-    const total = totalTasks + totalSubtasks;
-    const completed = completedTasks + completedSubtasks;
-    
-    if (total === 0) return 0;
-    return Math.round((completed / total) * 100);
+    return Math.round((totalScore / tasks.length) * 100);
   };
 
   const showCelebration = () => {
@@ -116,12 +117,12 @@ export default function TodoApp() {
 
   const addTask = () => {
     if (input.trim()) {
-      setTasks([...tasks, { 
+      setTasks([{ 
         id: Date.now(), 
         text: input, 
         completed: false,
         subtasks: []
-      }]);
+      }, ...tasks]);
       setInput('');
     }
   };
@@ -184,32 +185,53 @@ export default function TodoApp() {
 
   const toggleTask = (taskId) => {
     const task = tasks.find(t => t.id === taskId);
-    if (!task.completed) {
+    const newCompletedState = !task.completed;
+    
+    // Only celebrate when checking OFF (marking as complete)
+    if (newCompletedState) {
       showCelebration();
     }
     
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
+    setTasks(tasks.map(t => {
+      if (t.id === taskId) {
+        // When completing main task, complete all subtasks
+        // When uncompleting main task, uncomplete all subtasks
+        return {
+          ...t,
+          completed: newCompletedState,
+          subtasks: t.subtasks?.map(sub => ({ ...sub, completed: newCompletedState })) || []
+        };
+      }
+      return t;
+    }));
   };
 
   const toggleSubtask = (taskId, subtaskId) => {
     const task = tasks.find(t => t.id === taskId);
     const subtask = task.subtasks.find(s => s.id === subtaskId);
+    
+    // Only celebrate when checking OFF (marking as complete)
     if (!subtask.completed) {
       showCelebration();
     }
     
-    setTasks(tasks.map(task => 
-      task.id === taskId 
-        ? {
-            ...task,
-            subtasks: task.subtasks.map(sub =>
-              sub.id === subtaskId ? { ...sub, completed: !sub.completed } : sub
-            )
-          }
-        : task
-    ));
+    setTasks(tasks.map(t => {
+      if (t.id === taskId) {
+        const updatedSubtasks = t.subtasks.map(sub =>
+          sub.id === subtaskId ? { ...sub, completed: !sub.completed } : sub
+        );
+        
+        // Auto-complete main task if all subtasks are completed
+        const allSubtasksCompleted = updatedSubtasks.every(sub => sub.completed);
+        
+        return {
+          ...t,
+          subtasks: updatedSubtasks,
+          completed: allSubtasksCompleted && updatedSubtasks.length > 0
+        };
+      }
+      return t;
+    }));
   };
 
   const deleteTask = (taskId) => {
@@ -244,11 +266,13 @@ export default function TodoApp() {
     if (!draggedItem) return;
 
     if (!isSubtask && !draggedItem.isSubtask) {
+      // Reordering main tasks
       const newTasks = [...tasks];
       const [removed] = newTasks.splice(draggedItem.index, 1);
       newTasks.splice(dropIndex, 0, removed);
       setTasks(newTasks);
     } else if (isSubtask && draggedItem.isSubtask && draggedItem.parentId === parentId) {
+      // Reordering subtasks within same parent
       const newTasks = tasks.map(task => {
         if (task.id === parentId) {
           const newSubtasks = [...task.subtasks];
@@ -379,9 +403,18 @@ export default function TodoApp() {
                 <div
                   key={task.id}
                   draggable={editingTask !== task.id}
-                  onDragStart={(e) => handleDragStart(e, taskIndex)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, taskIndex)}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    handleDragStart(e, taskIndex);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.stopPropagation();
+                    handleDrop(e, taskIndex);
+                  }}
                   className={`${currentTheme.glass} ${currentTheme.text} rounded-2xl md:rounded-3xl transition-all duration-200 overflow-hidden`}
                 >
                   {/* Main Task */}
@@ -484,9 +517,18 @@ export default function TodoApp() {
                         <div
                           key={subtask.id}
                           draggable={editingSubtask?.subtaskId !== subtask.id}
-                          onDragStart={(e) => handleDragStart(e, subIndex, true, task.id)}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, subIndex, true, task.id)}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            handleDragStart(e, subIndex, true, task.id);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDrop={(e) => {
+                            e.stopPropagation();
+                            handleDrop(e, subIndex, true, task.id);
+                          }}
                           className={`ml-8 flex items-center gap-2 md:gap-3 p-3 rounded-xl ${currentTheme.glass} hover:bg-white/5 transition-all`}
                         >
                           {editingSubtask?.subtaskId !== subtask.id && (
