@@ -63,7 +63,7 @@ export default function TodoApp() {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
   const [subtaskInput, setSubtaskInput] = useState('');
-  const [theme, setTheme] = useState('blue');
+  const [theme, setTheme] = useState('red');
   const [showThemes, setShowThemes] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState({});
   const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
