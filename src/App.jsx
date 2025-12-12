@@ -137,7 +137,9 @@ export default function TodoApp() {
                 id: Date.now(), 
                 text: subtaskInput, 
                 completed: false 
-              }]
+              }],
+              // If adding a new incomplete subtask, main task should become incomplete
+              completed: false
             }
           : task
       ));
@@ -192,7 +194,7 @@ export default function TodoApp() {
       showCelebration();
     }
     
-    setTasks(tasks.map(t => {
+    const updatedTasks = tasks.map(t => {
       if (t.id === taskId) {
         // When completing main task, complete all subtasks
         // When uncompleting main task, uncomplete all subtasks
@@ -203,7 +205,12 @@ export default function TodoApp() {
         };
       }
       return t;
-    }));
+    });
+    
+    // Reorder: move completed tasks to the bottom
+    const incompleteTasks = updatedTasks.filter(t => !t.completed);
+    const completedTasks = updatedTasks.filter(t => t.completed);
+    setTasks([...incompleteTasks, ...completedTasks]);
   };
 
   const toggleSubtask = (taskId, subtaskId) => {
@@ -215,7 +222,7 @@ export default function TodoApp() {
       showCelebration();
     }
     
-    setTasks(tasks.map(t => {
+    const updatedTasks = tasks.map(t => {
       if (t.id === taskId) {
         const updatedSubtasks = t.subtasks.map(sub =>
           sub.id === subtaskId ? { ...sub, completed: !sub.completed } : sub
@@ -231,7 +238,12 @@ export default function TodoApp() {
         };
       }
       return t;
-    }));
+    });
+    
+    // Reorder: move completed tasks to the bottom
+    const incompleteTasks = updatedTasks.filter(t => !t.completed);
+    const completedTasks = updatedTasks.filter(t => t.completed);
+    setTasks([...incompleteTasks, ...completedTasks]);
   };
 
   const deleteTask = (taskId) => {
